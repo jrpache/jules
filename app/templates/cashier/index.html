@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Cashier</h1>
+    <form id="add-product-form">
+        <label for="code">Product Code:</label>
+        <input type="text" id="code" name="code" required autofocus>
+        <button type="submit">Add</button>
+    </form>
+
+    <table id="invoice-items">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <div id="totals">
+        <h3>Subtotals (VAT excl.)</h3>
+        <p>Básico (22%): <span id="subtotal-basico">0.00</span></p>
+        <p>Mínimo (10%): <span id="subtotal-minimo">0.00</span></p>
+        <p>Excento (0%): <span id="subtotal-excento">0.00</span></p>
+        <h3>Total (VAT incl.): <span id="total-amount">0.00</span></h3>
+    </div>
+
+    <button id="print-button">Print Invoice</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addProductForm = document.getElementById('add-product-form');
+            const invoiceItems = document.getElementById('invoice-items').getElementsByTagName('tbody')[0];
+            const codeInput = document.getElementById('code');
+
+            addProductForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                const code = codeInput.value;
+                fetch('/cashier/get_product/' + code)
+                    .then(response => response.json())
+                    .then(product => {
+                        if (product.error) {
+                            alert(product.error);
+                        } else {
+                            addProductToInvoice(product);
+                            updateTotals();
+                        }
+                        codeInput.value = '';
+                    });
+            });
+
+            function addProductToInvoice(product) {
+                const existingRow = document.querySelector(`tr[data-code="${product.code}"]`);
+                if (existingRow) {
+                    const quantityInput = existingRow.querySelector('.quantity');
+                    quantityInput.value = parseInt(quantityInput.value) + 1;
+                    updateRowTotal(existingRow);
+                } else {
+                    const newRow = invoiceItems.insertRow();
+                    newRow.dataset.code = product.code;
+                    newRow.dataset.vatType = product.vat_type;
+                    newRow.innerHTML = `
+                        <td>${product.code}</td>
+                        <td>${product.name}</td>
+                        <td><input type="number" class="quantity" value="1" min="1"></td>
+                        <td class="unit-price">${product.price.toFixed(2)}</td>
+                        <td class="total">${product.price.toFixed(2)}</td>
+                        <td><button class="delete-button">Delete</button></td>
+                    `;
+                    newRow.querySelector('.quantity').addEventListener('input', function() {
+                        updateRowTotal(newRow);
+                        updateTotals();
+                    });
+                    newRow.querySelector('.delete-button').addEventListener('click', function() {
+                        newRow.remove();
+                        updateTotals();
+                    });
+                }
+            }
+
+            function updateRowTotal(row) {
+                const quantity = row.querySelector('.quantity').value;
+                const unitPrice = parseFloat(row.querySelector('.unit-price').textContent);
+                row.querySelector('.total').textContent = (quantity * unitPrice).toFixed(2);
+            }
+
+            function updateTotals() {
+                let subtotalBasico = 0;
+                let subtotalMinimo = 0;
+                let subtotalExcento = 0;
+                let totalAmount = 0;
+
+                for (const row of invoiceItems.rows) {
+                    const total = parseFloat(row.querySelector('.total').textContent);
+                    const vatType = row.dataset.vatType;
+                    totalAmount += total;
+
+                    let priceWithoutVat = 0;
+                    if (vatType === 'BASICO') {
+                        priceWithoutVat = total / 1.22;
+                        subtotalBasico += priceWithoutVat;
+                    } else if (vatType === 'MINIMO') {
+                        priceWithoutVat = total / 1.10;
+                        subtotalMinimo += priceWithoutVat;
+                    } else {
+                        priceWithoutVat = total;
+                        subtotalExcento += priceWithoutVat;
+                    }
+                }
+
+                document.getElementById('subtotal-basico').textContent = subtotalBasico.toFixed(2);
+                document.getElementById('subtotal-minimo').textContent = subtotalMinimo.toFixed(2);
+                document.getElementById('subtotal-excento').textContent = subtotalExcento.toFixed(2);
+                document.getElementById('total-amount').textContent = totalAmount.toFixed(2);
+            }
+
+            document.getElementById('print-button').addEventListener('click', function() {
+                const items = [];
+                for (const row of invoiceItems.rows) {
+                    items.push({
+                        code: row.cells[0].textContent,
+                        name: row.cells[1].textContent,
+                        quantity: row.querySelector('.quantity').value,
+                        price: parseFloat(row.querySelector('.unit-price').textContent)
+                    });
+                }
+
+                fetch('/cashier/checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ items: items })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.invoice_id) {
+                        window.open('/cashier/invoice/' + data.invoice_id, '_blank');
+                        invoiceItems.innerHTML = '';
+                        updateTotals();
+                    } else {
+                        alert('Error creating invoice.');
+                    }
+                });
+            });
+        });
+    </script>
+{% endblock %}
