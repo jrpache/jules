@@ -8,10 +8,12 @@ namespace CajaRegistradora
 
         public Database()
         {
-            connectionString = "Data Source=Data/CajaRegistradora.sqlite;Version=3;";
-            if (!File.Exists("Data/CajaRegistradora.sqlite"))
+            string dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "CajaRegistradora.sqlite");
+            Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+            connectionString = $"Data Source={dbPath};Version=3;";
+            if (!File.Exists(dbPath))
             {
-                SQLiteConnection.CreateFile("Data/CajaRegistradora.sqlite");
+                SQLiteConnection.CreateFile(dbPath);
                 CreateTables();
             }
         }

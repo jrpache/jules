@@ -7,11 +7,13 @@ namespace CajaRegistradora
 {
     public partial class GestionArticulosForm : Form
     {
-        private string connectionString = "Data Source=Data/CajaRegistradora.sqlite;Version=3;";
+        private string connectionString;
         private DataTable dtArticulos;
 
         public GestionArticulosForm()
         {
+            string dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "CajaRegistradora.sqlite");
+            connectionString = $"Data Source={dbPath};Version=3;";
             InitializeComponent();
             CargarArticulos();
             ConfigurarControles(false);

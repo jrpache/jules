@@ -7,11 +7,13 @@ namespace CajaRegistradora
 {
     public partial class Form1 : Form
     {
-        private string connectionString = "Data Source=Data/CajaRegistradora.sqlite;Version=3;";
+        private string connectionString;
         private DataTable dtTicket;
 
         public Form1()
         {
+            string dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "CajaRegistradora.sqlite");
+            connectionString = $"Data Source={dbPath};Version=3;";
             InitializeComponent();
             InicializarTicket();
             txtBusquedaArticulo.TextChanged += new EventHandler(txtBusquedaArticulo_TextChanged);
